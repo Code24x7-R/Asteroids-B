@@ -1,0 +1,616 @@
+<html lang="en-us"><script src="{{cookiecutter.cdn}}pythons.js" type=module id="site" data-python="python{{cookiecutter.PYBUILD}}" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#<!--
+
+print("""
+Loading {{cookiecutter.title}} from {{cookiecutter.archive}}.apk
+    Pygbag Version : {{cookiecutter.version}}
+    Python         : {{cookiecutter.PYBUILD}}
+    CDN URL        : {{cookiecutter.cdn}}
+    Screen         : {{cookiecutter.width}}x{{cookiecutter.height}}
+    Title          : {{cookiecutter.title}}
+""")
+
+import sys
+import asyncio
+import platform
+import json
+from pathlib import Path
+
+async def custom_site():
+    import embed
+    platform.document.body.style.background = "#05050f"
+
+    platform.window.transfer.hidden = true
+    platform.window.canvas.style.visibility = "visible"
+
+    bundle = "{{cookiecutter.archive}}"
+    appdir = Path(f"/data/data/{bundle}")
+    appdir.mkdir()
+
+    if platform.window.location.host.find('.itch.zone') > 0:
+        import zipfile
+        async with platform.fopen("{{cookiecutter.archive}}.apk", "rb") as archive:
+            with zipfile.ZipFile(archive) as zip_ref:
+                zip_ref.extractall(appdir.as_posix())
+    else:
+        import tarfile
+        async with platform.fopen("{{cookiecutter.archive}}.tar.gz", "rb") as archive:
+            tar = tarfile.open(fileobj=archive, mode="r:gz")
+            tar.extractall(path=appdir.as_posix(), filter='tar')
+            tar.close()
+
+    platform.run_main(PyConfig, loaderhome=appdir / "assets", loadermain=None)
+
+    while embed.counter() < 0:
+        await asyncio.sleep(.1)
+
+    main = appdir / "assets" / "main.py"
+
+    if not platform.window.MM.UME:
+        __import__(__name__).__file__ = main
+        msg = "SYSTEM ONLINE // CLICK TO INITIALIZE HOLOGRAPHIC DISPLAY"
+        platform.window.infobox.innerText = msg
+        platform.window.infobox.classList.add("ready-pulse")
+        print("\n"*2, f"    * {msg} *" , "\n"*2)
+
+        while not platform.window.MM.UME:
+            await asyncio.sleep(.1)
+
+    await TopLevel_async_handler.start_toplevel(platform.shell, console=window.python.config.debug)
+    __import__(__name__).__file__ = main
+
+    def ui_callback(pkg):
+        platform.window.infobox.innerText = f"SYNCHRONIZING: {pkg}"
+
+    await shell.source(main, callback=ui_callback)
+
+    platform.window.infobox.style.display = "none"
+    platform.window.config.gui_divider = 1
+    platform.window.window_resize()
+    print("Asteroids 3D Holographic UIX started.")
+
+    shell.interactive()
+
+asyncio.run( custom_site() )
+
+# BEGIN BLOCK
+# =============================================================================
+# --></script><head>
+<script type="application/javascript">
+// Configuration for Pygbag runtime
+config = {
+    xtermjs : "{{cookiecutter.xtermjs}}",
+    _sdl2 : "canvas",
+    user_canvas : 0,
+    user_canvas_managed : 0,
+    gui_divider : 2,
+    ume_block : {{cookiecutter.ume_block}},
+    can_close : 0,
+    archive : "{{cookiecutter.archive}}",
+    gui_debug : 0,
+    cdn : "{{cookiecutter.cdn}}",
+    autorun : {{cookiecutter.autorun}},
+    PYBUILD : "{{cookiecutter.PYBUILD}}",
+    fb_ar   : 1.333,
+    fb_width : "{{cookiecutter.width}}",
+    fb_height : "{{cookiecutter.height}}"
+}
+
+function show_infobox() {
+    const infobox = document.getElementById("infobox");
+    if (infobox) {
+        infobox.style.display = "block";
+    }
+}
+</script>
+
+    <title>Asteroids - 3D Holographic UIX (WebAssembly)</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Asteroids 3D Holographic UIX - Cyberpunk WebAssembly arcade game with tactical stealth, gas cloud detonation, and local leaderboard.">
+    <meta name="theme-color" content="#05050f">
+    <link rel="icon" type="image/png" href="favicon.png" sizes="32x32">
+
+    <style>
+        :root {
+            --bg-color: #05050f;
+            --cyan-glow: #00ffff;
+            --magenta-glow: #ff00ff;
+            --green-glow: #39ff14;
+            --orange-glow: #ffaa00;
+            --panel-bg: rgba(10, 10, 26, 0.85);
+            --border-neon: rgba(0, 255, 255, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 50% 20%, rgba(20, 20, 60, 0.6) 0%, transparent 60%),
+                radial-gradient(circle at 80% 80%, rgba(60, 10, 50, 0.3) 0%, transparent 50%);
+            color: #dcdcf0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Subtle scanlines overlay */
+        body::before {
+            content: " ";
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Top Header */
+        header.cyber-header {
+            width: 100%;
+            max-width: 1100px;
+            padding: 12px 20px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-neon);
+            margin-bottom: 8px;
+            background: rgba(5, 5, 20, 0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        .title-block {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-title {
+            font-size: 1.4rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            color: var(--cyan-glow);
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.7), 0 0 20px rgba(0, 255, 255, 0.3);
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            color: var(--magenta-glow);
+            text-shadow: 0 0 6px rgba(255, 0, 255, 0.5);
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 0.8rem;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border: 1px solid var(--green-glow);
+            color: var(--green-glow);
+            background: rgba(57, 255, 20, 0.08);
+            border-radius: 2px;
+            box-shadow: 0 0 6px rgba(57, 255, 20, 0.2);
+            font-weight: bold;
+        }
+
+        /* Main Game Wrapper */
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 1024px;
+            aspect-ratio: 4 / 3;
+            background: #020208;
+            border: 2px solid var(--cyan-glow);
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.8);
+            margin: 4px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #game-container:fullscreen {
+            max-width: 100vw;
+            max-height: 100vh;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            border-radius: 0;
+            margin: 0;
+            background: #000;
+        }
+
+        /* Canvas */
+        canvas.emscripten {
+            border: 0 none;
+            background-color: transparent;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain;
+            image-rendering: pixelated;
+            display: block;
+            outline: none;
+            z-index: 5;
+        }
+
+        /* Loading / Prompt Infobox */
+        #infobox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 12, 28, 0.94);
+            border: 2px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            font-size: 1.05rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            padding: 20px 32px;
+            text-align: center;
+            z-index: 50;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5), inset 0 0 20px rgba(0, 255, 255, 0.2);
+            border-radius: 4px;
+            max-width: 85%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #infobox.ready-pulse {
+            border-color: var(--magenta-glow);
+            color: #ffffff;
+            background: rgba(30, 8, 35, 0.95);
+            box-shadow: 0 0 35px rgba(255, 0, 255, 0.6), inset 0 0 25px rgba(255, 0, 255, 0.3);
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 25px rgba(255, 0, 255, 0.4); }
+            100% { transform: translate(-50%, -50%) scale(1.03); box-shadow: 0 0 45px rgba(0, 255, 255, 0.8); }
+        }
+
+        #transfer {
+            position: absolute;
+            top: 58%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 40;
+            text-align: center;
+        }
+
+        #status {
+            color: var(--cyan-glow);
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        progress {
+            width: 240px;
+            height: 10px;
+            accent-color: var(--cyan-glow);
+            border: 1px solid var(--cyan-glow);
+            border-radius: 3px;
+        }
+
+        /* Control deck and telemetry footer */
+        .controls-deck {
+            width: 100%;
+            max-width: 1024px;
+            margin: 8px auto;
+            padding: 10px 16px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-neon);
+            border-radius: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+        }
+
+        .keys-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .key-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0, 255, 255, 0.08);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            padding: 3px 8px;
+            border-radius: 3px;
+            color: #b0e0ff;
+        }
+
+        .key-badge kbd {
+            background: #151530;
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 1px 5px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 0.75rem;
+        }
+
+        .deck-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .cyber-btn {
+            background: transparent;
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            padding: 6px 14px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .cyber-btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+            color: #ffffff;
+        }
+
+        /* Mobile Touch Controls */
+        #touch-controls {
+            display: none;
+            width: 100%;
+            max-width: 1024px;
+            margin: 6px auto;
+            padding: 8px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (hover: none) and (pointer: coarse), (max-width: 800px) {
+            #touch-controls {
+                display: flex;
+            }
+        }
+
+        .touch-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .touch-btn {
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: rgba(15, 15, 40, 0.8);
+            border: 2px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+
+        .touch-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            color: #ffffff;
+        }
+
+        .touch-btn.btn-fire {
+            border-color: var(--magenta-glow);
+            color: var(--magenta-glow);
+            width: 60px;
+            height: 60px;
+        }
+
+        .touch-btn.btn-fire:active {
+            background: rgba(255, 0, 255, 0.4);
+            color: #fff;
+        }
+
+        /* Footer */
+        footer.cyber-footer {
+            margin-top: auto;
+            padding: 12px;
+            font-size: 0.75rem;
+            color: #606085;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+
+        footer.cyber-footer a {
+            color: var(--cyan-glow);
+            text-decoration: none;
+        }
+    </style>
+
+    <script src="{{cookiecutter.cdn}}/browserfs.min.js"></script>
+</head>
+
+<body>
+    <!-- Cyberpunk Header -->
+    <header class="cyber-header">
+        <div class="title-block">
+            <h1 class="main-title">Asteroids 3D</h1>
+            <span class="subtitle">Holographic Tactical UIX // WASM Core</span>
+        </div>
+        <div class="header-status">
+            <span class="status-badge" id="storage-status">MEM: LOCALSTORAGE</span>
+            <span class="status-badge">WASM 60FPS</span>
+        </div>
+    </header>
+
+    <!-- Game Viewport Container -->
+    <div id="game-container">
+        <!-- Pygbag Canvas -->
+        <canvas class="emscripten" id="canvas" width="1024" height="768" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+        <canvas class="emscripten" id="canvas3d" width="{{cookiecutter.width}}px" height="{{cookiecutter.height}}px" oncontextmenu="event.preventDefault()" tabindex="1" hidden></canvas>
+
+        <!-- Initializer Infobox -->
+        <div id="infobox" onclick="handleInfoboxClick()">INITIALIZING TACTICAL MATRIX...</div>
+
+        <!-- Download progress -->
+        <div id="transfer">
+            <div class="emscripten" id="status">DOWNLOADING WASM MODULES...</div>
+            <div class="emscripten">
+                <progress value="0" max="100" id="progress"></progress>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Virtual Touch Pad -->
+    <div id="touch-controls">
+        <div class="touch-group">
+            <button class="touch-btn" id="t-left" aria-label="Rotate Left">◀</button>
+            <button class="touch-btn" id="t-right" aria-label="Rotate Right">▶</button>
+            <button class="touch-btn" id="t-thrust" aria-label="Thrust">▲</button>
+        </div>
+        <div class="touch-group">
+            <button class="touch-btn btn-fire" id="t-fire" aria-label="Fire Plasma">💥</button>
+            <button class="touch-btn" id="t-mute" aria-label="Mute">🔇</button>
+        </div>
+    </div>
+
+    <!-- HUD Control Deck -->
+    <div class="controls-deck">
+        <div class="keys-grid">
+            <div class="key-badge"><kbd>←</kbd><kbd>→</kbd> ROTATE</div>
+            <div class="key-badge"><kbd>↑</kbd> THRUST</div>
+            <div class="key-badge"><kbd>SPACE</kbd> PLASMA FIRE</div>
+            <div class="key-badge"><kbd>M</kbd> MUTE</div>
+            <div class="key-badge"><kbd>R</kbd> REBOOT</div>
+            <div class="key-badge"><kbd>Q</kbd> ABORT</div>
+        </div>
+        <div class="deck-actions">
+            <button class="cyber-btn" id="btn-fullscreen" onclick="toggleFullscreen()">⛶ FULLSCREEN</button>
+        </div>
+    </div>
+
+    <footer class="cyber-footer">
+        ASTEROIDS 3D HOLOGRAPHIC // POWERED BY PYTHON, PYGAME-CE & WEBASSEMBLY
+    </footer>
+
+    <!-- Hidden Pygbag diagnostic containers -->
+    <div id="system" hidden>
+        <button id="aiostop" disabled></button>
+        <button id="aiopaused_true" disabled></button>
+        <button id="aiopaused_false" disabled></button>
+        <button id="pygame_mixer_music_pause" disabled></button>
+        <div id="load_min"></div><div id="load_avg"></div><div id="load_max"></div>
+        <button id="load_rst" disabled></button>
+        <div id="level"></div><div id="stateBattery"></div>
+    </div>
+    <div id="box" hidden><div id="info"></div><iframe id="iframe" src="{{cookiecutter.cdn}}empty.html"></iframe></div>
+    <div id="dlg" hidden><input type="file" id="dlg_multifile"></div>
+    <div id="pyconsole" hidden><div id="terminal"></div></div>
+
+    <script type="application/javascript">
+    function handleInfoboxClick() {
+        if (window.MM && !window.MM.UME) {
+            window.MM.UME = true;
+        }
+    }
+
+    function toggleFullscreen() {
+        const elem = document.getElementById("game-container");
+        if (!document.fullscreenElement) {
+            if (elem.requestFullscreen) elem.requestFullscreen();
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+            else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
+    // Key event simulator for virtual touch controls
+    function dispatchKey(type, key, code, keyCode) {
+        const evt = new KeyboardEvent(type, {
+            key: key,
+            code: code,
+            keyCode: keyCode,
+            which: keyCode,
+            bubbles: true,
+            cancelable: true
+        });
+        window.dispatchEvent(evt);
+        const canvas = document.getElementById('canvas');
+        if (canvas) canvas.dispatchEvent(evt);
+    }
+
+    function bindTouchKey(elemId, key, code, keyCode) {
+        const el = document.getElementById(elemId);
+        if (!el) return;
+        
+        const startHandler = (e) => {
+            e.preventDefault();
+            dispatchKey('keydown', key, code, keyCode);
+        };
+        const endHandler = (e) => {
+            e.preventDefault();
+            dispatchKey('keyup', key, code, keyCode);
+        };
+
+        el.addEventListener('touchstart', startHandler, { passive: false });
+        el.addEventListener('touchend', endHandler, { passive: false });
+        el.addEventListener('touchcancel', endHandler, { passive: false });
+        el.addEventListener('mousedown', startHandler);
+        el.addEventListener('mouseup', endHandler);
+        el.addEventListener('mouseleave', endHandler);
+    }
+
+    bindTouchKey('t-left', 'ArrowLeft', 'ArrowLeft', 37);
+    bindTouchKey('t-right', 'ArrowRight', 'ArrowRight', 39);
+    bindTouchKey('t-thrust', 'ArrowUp', 'ArrowUp', 38);
+    bindTouchKey('t-fire', ' ', 'Space', 32);
+    bindTouchKey('t-mute', 'm', 'KeyM', 77);
+
+    async function custom_onload(debug_hidden) {
+        const pyconsole = document.getElementById("pyconsole");
+        const system = document.getElementById("system");
+        const transfer = document.getElementById("transfer");
+        const box = document.getElementById("box");
+
+        if (pyconsole) pyconsole.hidden = true;
+        if (system) system.hidden = true;
+        if (box) box.hidden = true;
+
+        show_infobox();
+    }
+
+    function custom_prerun() {
+        console.log("Asteroids 3D WASM pre-run initialization");
+    }
+
+    function custom_postrun() {
+        console.log("Asteroids 3D WASM post-run ready");
+    }
+    </script>
+</body>
+</html>
