@@ -20,6 +20,7 @@ python3 -m pygbag --build --template web/template.tmpl --icon Asteroid.png --app
 echo "[3/4] Packaging static output to dist/web/..."
 mkdir -p dist/web
 cp -r build/web/* dist/web/
+[ -f CNAME ] && cp CNAME dist/web/CNAME
 
 echo "[4/4] Creating itch.io web zip archive..."
 rm -f dist/asteroids-3d-web.zip

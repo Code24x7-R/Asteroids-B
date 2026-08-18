@@ -37,7 +37,7 @@ jobs:
           python -m pygbag --build --template web/template.tmpl --icon Asteroid.png --app_name asteroids main.py
           mkdir -p dist/web
           cp -r build/web/* dist/web/
-
+          if [ -f CNAME ]; then cp CNAME dist/web/CNAME; fi
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

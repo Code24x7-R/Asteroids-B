@@ -37,6 +37,9 @@ if ($LASTEXITCODE -ne 0) {
 # Step 4: Copy artifacts to dist\web
 Write-Host "`n[4/5] Syncing artifacts to dist\web\..." -ForegroundColor Yellow
 Copy-Item -Path "build\web\*" -Destination "dist\web\" -Recurse -Force
+if (Test-Path "CNAME") {
+    Copy-Item "CNAME" -Destination "dist\web\CNAME" -Force
+}
 Write-Host "Generated files in dist\web\:" -ForegroundColor Green
 Get-ChildItem "dist\web" | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 

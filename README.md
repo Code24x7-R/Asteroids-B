@@ -60,7 +60,7 @@ To build and immediately launch a local preview server:
 ```
 
 ### 3. Deploy Targets
-- **GitHub Pages:** A pre-configured workflow (`.github/workflows/deploy-pages.yml`) automatically builds and publishes changes on push to `main`.
+- **GitHub Pages:** A pre-configured workflow (`.github/workflows/deploy-pages.yml`) automatically builds and publishes changes on push to `main`. Served at the custom domain [https://asteroids.mouseclick.au](https://asteroids.mouseclick.au) (HTTPS enforced; `CNAME` file is bundled with every deploy).
 - **itch.io:** Upload the generated `dist/asteroids-3d-web.zip` archive directly as an HTML5 web game.
 - **Static Hosting:** Drop all files from `dist/web/` onto any static hosting server or CDN.
 ## 🎮 Controls
