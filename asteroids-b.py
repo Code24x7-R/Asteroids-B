@@ -1,7 +1,6 @@
 import pygame
 import math
 import random
-import wave
 import struct
 import io
 import json
@@ -254,17 +253,19 @@ def resolve_asteroid_collision(a1, a2):
     a1.vel += n * (((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2) - v1)
     a2.vel += n * (((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2) - v2)
 
+class DummySound:
+    def play(self, *args, **kwargs): pass
+    def stop(self, *args, **kwargs): pass
+    def set_volume(self, *args, **kwargs): pass
+
 class SoundManager:
     muted = False
     @staticmethod
     def create_sound(freq, duration, volume=0.3, type='sine'):
-        sample_rate = 44100
-        n_samples = int(sample_rate * duration)
-        buf = io.BytesIO()
-        with wave.open(buf, 'w') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
+        try:
+            sample_rate = 44100
+            n_samples = int(sample_rate * duration)
+            frames = bytearray()
             for i in range(n_samples):
                 t = i / sample_rate
                 envelope = max(0, 1 - (t / duration))
@@ -275,10 +276,16 @@ class SoundManager:
                 elif type == 'sawtooth': val = 2 * (t * freq - math.floor(t * freq + 0.5))
                 elif type == 'clang': val = 0.5 * math.sin(2 * math.pi * freq * t) + 0.3 * math.sin(2 * math.pi * freq * 1.3 * t)
                 else: val = 0
-                wf.writeframes(struct.pack('h', int(val * envelope * volume * 32767)))
-        buf.seek(0)
-        return pygame.mixer.Sound(buf)
-
+                frames += struct.pack('<h', int(val * envelope * volume * 32767))
+            data_size = len(frames)
+            header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + data_size, b'WAVE', b'fmt ', 16, 1, 1, sample_rate, sample_rate * 2, 2, 16, b'data', data_size)
+            raw_wav = bytes(header + frames)
+            try:
+                return pygame.mixer.Sound(buffer=raw_wav)
+            except Exception:
+                return pygame.mixer.Sound(raw_wav)
+        except Exception:
+            return DummySound()
     def __init__(self):
         self.snd_shoot = self.create_sound(880, 0.15, 0.15, 'pew')
         self.snd_explode = self.create_sound(100, 0.4, 0.3, 'noise')
@@ -291,7 +298,11 @@ class SoundManager:
         self.snd_boss_pulse = self.create_sound(40, 0.3, 0.4, 'sawtooth')
 
     def play(self, sound):
-        if not SoundManager.muted: sound.play()
+        if not SoundManager.muted and sound:
+            try:
+                sound.play()
+            except Exception:
+                pass
 
 class Particle(pygame.sprite.Sprite):
     def __init__(self, pos, vel, color, life, size=2, z_vel=0, z=0, projected=True):
@@ -1789,5 +1800,4 @@ async def main():
     game = Game()
     await game.run()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())

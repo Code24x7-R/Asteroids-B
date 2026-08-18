@@ -44,17 +44,6 @@ async def custom_site():
         await asyncio.sleep(.1)
 
     main = appdir / "assets" / "main.py"
-
-    if not platform.window.MM.UME:
-        __import__(__name__).__file__ = main
-        msg = "SYSTEM ONLINE // CLICK TO INITIALIZE HOLOGRAPHIC DISPLAY"
-        platform.window.infobox.innerText = msg
-        platform.window.infobox.classList.add("ready-pulse")
-        print("\n"*2, f"    * {msg} *" , "\n"*2)
-
-        while not platform.window.MM.UME:
-            await asyncio.sleep(.1)
-
     await TopLevel_async_handler.start_toplevel(platform.shell, console=window.python.config.debug)
     __import__(__name__).__file__ = main
 
@@ -83,7 +72,7 @@ config = {
     user_canvas : 0,
     user_canvas_managed : 0,
     gui_divider : 2,
-    ume_block : {{cookiecutter.ume_block}},
+    ume_block : 0,
     can_close : 0,
     archive : "{{cookiecutter.archive}}",
     gui_debug : 0,
@@ -451,7 +440,7 @@ function show_infobox() {
         }
     </style>
 
-    <script src="{{cookiecutter.cdn}}/browserfs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/BrowserFS/2.0.0/browserfs.min.js"></script>
 </head>
 
 <body>
@@ -611,6 +600,18 @@ function show_infobox() {
     function custom_postrun() {
         console.log("Asteroids 3D WASM post-run ready");
     }
+
+    function unlockAudio() {
+        if (window.MM) {
+            window.MM.UME = true;
+        }
+        if (window.SDL2 && window.SDL2.audioContext && window.SDL2.audioContext.state === 'suspended') {
+            window.SDL2.audioContext.resume();
+        }
+    }
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
     </script>
 </body>
 </html>
