@@ -17,10 +17,12 @@ from pathlib import Path
 
 async def custom_site():
     import embed
+    import os
+    # Pin the WASM package index to the public CDN. Without this, aio.pep0723
+    # rewrites wheel URLs to http://localhost:8000/cdn/ whenever the page is
+    # served from any localhost:8xxx static server, breaking pygame-ce loading.
+    os.environ["PYGPI"] = "https://pygame-web.github.io/cdn/"
     platform.document.body.style.background = "#05050f"
-
-    platform.window.transfer.hidden = true
-    platform.window.canvas.style.visibility = "visible"
 
     bundle = "{{cookiecutter.archive}}"
     appdir = Path(f"/data/data/{bundle}")
@@ -434,6 +436,65 @@ function show_infobox() {
             letter-spacing: 1px;
         }
 
+
+        .touch-btn.btn-sys {
+            border-color: var(--orange-glow);
+            color: var(--orange-glow);
+            font-size: 0.8rem;
+        }
+
+        .touch-btn.btn-sys:active {
+            background: rgba(255, 170, 0, 0.4);
+            color: #fff;
+        }
+
+        #touch-keypad {
+            display: none;
+            width: 100%;
+            max-width: 1024px;
+            margin: 4px auto;
+            padding: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 6px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-neon);
+            border-radius: 4px;
+        }
+
+        #touch-keypad .key-btn {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 6px;
+            border-radius: 3px;
+            background: rgba(15, 15, 40, 0.8);
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 0.85rem;
+            touch-action: manipulation;
+        }
+
+        #touch-keypad .key-btn:active {
+            background: rgba(0, 255, 255, 0.4);
+            color: #fff;
+        }
+
+        #touch-keypad .key-btn.key-wide {
+            min-width: 52px;
+            border-color: var(--magenta-glow);
+            color: var(--magenta-glow);
+        }
+
+        @media (hover: none) and (pointer: coarse), (max-width: 800px) {
+            #touch-keypad.show {
+                display: flex;
+            }
+            .keys-grid {
+                display: none;
+            }
+        }
         footer.cyber-footer a {
             color: var(--cyan-glow);
             text-decoration: none;
@@ -462,18 +523,6 @@ function show_infobox() {
         <canvas class="emscripten" id="canvas" width="1024" height="768" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
         <canvas class="emscripten" id="canvas3d" width="{{cookiecutter.width}}px" height="{{cookiecutter.height}}px" oncontextmenu="event.preventDefault()" tabindex="1" hidden></canvas>
 
-        <!-- Initializer Infobox -->
-        <div id="infobox" onclick="handleInfoboxClick()">INITIALIZING TACTICAL MATRIX...</div>
-
-        <!-- Download progress -->
-        <div id="transfer">
-            <div class="emscripten" id="status">DOWNLOADING WASM MODULES...</div>
-            <div class="emscripten">
-                <progress value="0" max="100" id="progress"></progress>
-            </div>
-        </div>
-    </div>
-
     <!-- Mobile Virtual Touch Pad -->
     <div id="touch-controls">
         <div class="touch-group">
@@ -484,8 +533,13 @@ function show_infobox() {
         <div class="touch-group">
             <button class="touch-btn btn-fire" id="t-fire" aria-label="Fire Plasma">💥</button>
             <button class="touch-btn" id="t-mute" aria-label="Mute">🔇</button>
+            <button class="touch-btn btn-sys" id="t-reboot" aria-label="Reboot">⟳</button>
+            <button class="touch-btn btn-sys" id="t-keypad" aria-label="Toggle Keypad">⌨</button>
         </div>
     </div>
+
+    <!-- Mobile ID Entry Keypad -->
+    <div id="touch-keypad"></div>
 
     <!-- HUD Control Deck -->
     <div class="controls-deck">
@@ -538,7 +592,9 @@ function show_infobox() {
         }
     }
 
-    // Key event simulator for virtual touch controls
+    // Key event simulator for virtual touch controls.
+    // SDL (pygame-ce WASM) listens for keydown/keyup on `document`,
+    // so a single dispatch to document is sufficient (no double events).
     function dispatchKey(type, key, code, keyCode) {
         const evt = new KeyboardEvent(type, {
             key: key,
@@ -548,18 +604,17 @@ function show_infobox() {
             bubbles: true,
             cancelable: true
         });
-        window.dispatchEvent(evt);
-        const canvas = document.getElementById('canvas');
-        if (canvas) canvas.dispatchEvent(evt);
+        document.dispatchEvent(evt);
     }
 
-    function bindTouchKey(elemId, key, code, keyCode) {
-        const el = document.getElementById(elemId);
+    function bindTouchKey(target, key, code, keyCode, withPress) {
+        const el = (typeof target === 'string') ? document.getElementById(target) : target;
         if (!el) return;
-        
+
         const startHandler = (e) => {
             e.preventDefault();
             dispatchKey('keydown', key, code, keyCode);
+            if (withPress) dispatchKey('keypress', key, code, keyCode);
         };
         const endHandler = (e) => {
             e.preventDefault();
@@ -579,6 +634,48 @@ function show_infobox() {
     bindTouchKey('t-thrust', 'ArrowUp', 'ArrowUp', 38);
     bindTouchKey('t-fire', ' ', 'Space', 32);
     bindTouchKey('t-mute', 'm', 'KeyM', 77);
+    bindTouchKey('t-reboot', 'r', 'KeyR', 82);
+
+    // A-Z / 0-9 keypad for pilot ID entry after game over
+    (function buildKeypad() {
+        const pad = document.getElementById('touch-keypad');
+        if (!pad) return;
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+        for (const ch of chars) {
+            const b = document.createElement('button');
+            b.className = 'key-btn';
+            b.textContent = ch;
+            b.setAttribute('aria-label', 'Enter ' + ch);
+            const code = (ch >= '0' && ch <= '9') ? 'Digit' + ch : 'Key' + ch;
+            bindTouchKey(b, ch, code, ch.charCodeAt(0), true);
+            pad.appendChild(b);
+        }
+        const bs = document.createElement('button');
+        bs.className = 'key-btn key-wide';
+        bs.textContent = '⌫';
+        bs.setAttribute('aria-label', 'Backspace');
+        bindTouchKey(bs, 'Backspace', 'Backspace', 8);
+        pad.appendChild(bs);
+        const en = document.createElement('button');
+        en.className = 'key-btn key-wide';
+        en.textContent = '⏎';
+        en.setAttribute('aria-label', 'Confirm ID');
+        bindTouchKey(en, 'Enter', 'Enter', 13, true);
+        pad.appendChild(en);
+    })();
+
+    (function bindKeypadToggle() {
+        const btn = document.getElementById('t-keypad');
+        const pad = document.getElementById('touch-keypad');
+        if (!btn || !pad) return;
+        const toggle = (e) => {
+            e.preventDefault();
+            pad.classList.toggle('show');
+        };
+        btn.addEventListener('touchstart', toggle, { passive: false });
+        btn.addEventListener('mousedown', toggle);
+        btn.addEventListener('click', (e) => e.preventDefault());
+    })();
 
     async function custom_onload(debug_hidden) {
         const pyconsole = document.getElementById("pyconsole");

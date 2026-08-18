@@ -1793,11 +1793,10 @@ class Game:
 
             pygame.display.flip()
             clock.tick(FPS)
-            await asyncio.sleep(0)
-        pygame.quit()
-
 async def main():
+    global game
     game = Game()
     await game.run()
 
+game = None
 asyncio.run(main())
