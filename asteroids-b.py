@@ -66,11 +66,11 @@ def show_resolution_menu():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
-                exit()
+                sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     pygame.quit()
-                    exit()
+                    sys.exit()
                 for key, (w, h) in options:
                     if event.unicode.lower() == key.lower():
                         selection = (w, h)
@@ -85,8 +85,22 @@ def show_resolution_menu():
     pygame.quit()
     return selection
 
+# ------------------------------------------------------------
+# DISPLAY / RESOLUTION
+# ------------------------------------------------------------
+
+# Logical resolution used by the game itself.
+#
+# All game coordinates, physics, projection, sprites and UI
+# continue to use SCREEN_WIDTH / SCREEN_HEIGHT.
+#
+# WASM/browser presentation is handled separately.
+WASM_WIDTH = 980
+WASM_HEIGHT = 720
+
 start_level = 1
 custom_res = None
+
 for arg in sys.argv:
     if arg.startswith('--level='):
         try:
@@ -95,6 +109,7 @@ for arg in sys.argv:
                 start_level = 1
         except Exception:
             pass
+
     elif arg.startswith('--res='):
         try:
             w, h = arg.split('=')[1].split('x')
@@ -102,18 +117,52 @@ for arg in sys.argv:
         except Exception:
             pass
 
+
 if IS_WASM:
-    SCREEN_WIDTH, SCREEN_HEIGHT = (1024, 768)
+    # --------------------------------------------------------
+    # BROWSER / WASM
+    #
+    # NEVER use browser/native resolution here.
+    #
+    # This is the logical game framebuffer. The browser/pygbag
+    # is responsible for presenting it at the appropriate CSS
+    # size and device pixel ratio.
+    # --------------------------------------------------------
+    SCREEN_WIDTH = WASM_WIDTH
+    SCREEN_HEIGHT = WASM_HEIGHT
+
 elif custom_res is not None:
+    # --------------------------------------------------------
+    # DESKTOP -- explicit command-line resolution
+    # --------------------------------------------------------
     SCREEN_WIDTH, SCREEN_HEIGHT = custom_res
+
 else:
+    # --------------------------------------------------------
+    # DESKTOP -- retain existing automatic/native resolution
+    # selection.
+    # --------------------------------------------------------
     chosen_res = show_resolution_menu()
     SCREEN_WIDTH, SCREEN_HEIGHT = chosen_res
 
-pygame.init()
-pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.init()
+pygame.mixer.init(
+    frequency=44100,
+    size=-16,
+    channels=1,
+    buffer=512
+)
+
+# Create the game framebuffer.
+#
+# IMPORTANT:
+# SCREEN_WIDTH / SCREEN_HEIGHT are logical coordinates.
+# Do not multiply these by devicePixelRatio.
+screen = pygame.display.set_mode(
+    (SCREEN_WIDTH, SCREEN_HEIGHT)
+)
+
 pygame.display.set_caption("Asteroids - 3D Holographic UIX")
 
 BLACK = (5, 5, 15)
