@@ -67,6 +67,19 @@ asyncio.run( custom_site() )
 # =============================================================================
 # --></script><head>
 <script type="application/javascript">
+// Normalize devicePixelRatio for pygbag (doesn't support fractional DPR like 2.75)
+(function() {
+    var dpr = window.devicePixelRatio || 1;
+    // Round to nearest integer; clamp to [1, 3] for pygbag compatibility
+    var safeDPR = Math.max(1, Math.min(3, Math.round(dpr)));
+    if (safeDPR !== dpr) {
+        Object.defineProperty(window, 'devicePixelRatio', {
+            get: function() { return safeDPR; },
+            configurable: true
+        });
+    }
+})();
+
 // Pygbag config — let pygbag manage canvas (user_canvas_managed: 0)
 config = {
     xtermjs : "{{cookiecutter.xtermjs}}",
@@ -86,11 +99,37 @@ config = {
     fb_height : "768"
 }
 
-// Resize handler: update container and let pygbag scale canvas
+// Wrap pygbag's window_canvas_adjust to catch DPR errors on mobile
 (function() {
+    // Pygbag calls window_canvas_adjust internally but some mobile DPR
+    // values (e.g. 2.75) cause "Unsupported device pixel ratio" errors.
+    // Wrap it to silently fall back to DPR=1 when this happens.
+    var origAdjust = window.window_canvas_adjust;
+    if (origAdjust) {
+        window.window_canvas_adjust = function() {
+            try {
+                return origAdjust.apply(this, arguments);
+            } catch (e) {
+                if (e.message && e.message.includes('pixel ratio')) {
+                    // Temporarily override DPR and retry
+                    var realDPR = window.devicePixelRatio;
+                    Object.defineProperty(window, 'devicePixelRatio', {
+                        value: 1, configurable: true, writable: true
+                    });
+                    try { return origAdjust.apply(this, arguments); }
+                    finally {
+                        Object.defineProperty(window, 'devicePixelRatio', {
+                            value: realDPR, configurable: true, writable: true
+                        });
+                    }
+                }
+                throw e;
+            }
+        };
+    }
+
+    // Resize handler: let pygbag manage canvas sizing
     function onResize() {
-        // Pygbag's window_canvas_adjust() handles canvas sizing
-        // when user_canvas_managed: 0
         if (typeof window_canvas_adjust === 'function') {
             window_canvas_adjust();
         }
