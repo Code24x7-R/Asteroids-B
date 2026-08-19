@@ -86,6 +86,66 @@ config = {
     fb_height : "768"
 }
 
+// Mobile-responsive canvas sizing with device pixel ratio support
+function getOptimalCanvasSize() {
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const aspectRatio = 4 / 3;
+
+    // Reserve space for touch controls and header on mobile
+    const isMobile = viewportW < 768;
+    const reservedVSpace = isMobile ? 220 : 120; // touch controls + header
+    const availableH = viewportH - reservedVSpace;
+    const availableW = viewportW;
+
+    // Fit within available space while maintaining 4:3 aspect ratio
+    let cssWidth, cssHeight;
+    if (availableW / availableH > aspectRatio) {
+        // Width is the limiting factor
+        cssHeight = availableH;
+        cssWidth = Math.floor(availableH * aspectRatio);
+    } else {
+        // Height is the limiting factor
+        cssWidth = availableW;
+        cssHeight = Math.floor(availableW / aspectRatio);
+    }
+
+    // Clamp to reasonable bounds
+    cssWidth = Math.max(320, Math.min(cssWidth, 1024));
+    cssHeight = Math.max(240, Math.min(cssHeight, 768));
+
+    // Physical pixels = CSS pixels × device pixel ratio
+    const physicalWidth = Math.floor(cssWidth * dpr);
+    const physicalHeight = Math.floor(cssHeight * dpr);
+
+    return { cssWidth, cssHeight, physicalWidth, physicalHeight, dpr };
+}
+
+function applyCanvasSize() {
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+    const size = getOptimalCanvasSize();
+    // Set physical canvas resolution for crisp rendering
+    if (canvas.width !== size.physicalWidth || canvas.height !== size.physicalHeight) {
+        canvas.width = size.physicalWidth;
+        canvas.height = size.physicalHeight;
+    }
+    // Update config for pygbag
+    config.fb_width = String(size.physicalWidth);
+    config.fb_height = String(size.physicalHeight);
+    config.fb_ar = size.cssWidth / size.cssHeight;
+    return size;
+}
+
+// Apply on load and on resize/orientation change
+window.addEventListener('resize', applyCanvasSize);
+window.addEventListener('orientationchange', function() {
+    setTimeout(applyCanvasSize, 200);
+});
+// Initial apply after a short delay to ensure DOM is ready
+setTimeout(applyCanvasSize, 100);
+
 function show_infobox() {
     const infobox = document.getElementById("infobox");
     if (infobox) {
@@ -129,12 +189,15 @@ function show_infobox() {
                 radial-gradient(circle at 80% 80%, rgba(60, 10, 50, 0.3) 0%, transparent 50%);
             color: #dcdcf0;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             overflow-x: hidden;
             position: relative;
+            margin: 0;
+            padding: 0;
         }
 
         /* Subtle scanlines overlay */
@@ -215,6 +278,18 @@ function show_infobox() {
             overflow: hidden;
         }
 
+        /* Mobile: fill viewport, no max-width constraint */
+        @media (max-width: 768px) {
+            #game-container {
+                max-width: 100vw;
+                width: 100vw;
+                margin: 0;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+            }
+        }
+
         #game-container:fullscreen {
             max-width: 100vw;
             max-height: 100vh;
@@ -230,10 +305,10 @@ function show_infobox() {
         canvas.emscripten {
             border: 0 none;
             background-color: transparent;
-            width: 100% !important;
-            height: 100% !important;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
-            image-rendering: pixelated;
+            image-rendering: auto;
             display: block;
             outline: none;
             z-index: 5;
@@ -421,6 +496,26 @@ function show_infobox() {
         .touch-btn.btn-fire:active {
             background: rgba(255, 0, 255, 0.4);
             color: #fff;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .controls-deck { display: none; }
+            footer.cyber-footer { display: none; }
+            header { padding: 4px 8px; }
+            .main-title { font-size: 0.9rem; letter-spacing: 1px; }
+            .subtitle { font-size: 0.6rem; }
+            .header-status { display: none; }
+            #touch-controls { padding: 4px 8px; gap: 4px; }
+            .touch-group { gap: 6px; }
+            .touch-btn { width: 48px; height: 48px; font-size: 0.9rem; }
+            .touch-btn.btn-fire { width: 56px; height: 56px; }
+            #touch-keypad { bottom: 160px; }
+        }
+
+        @media (max-width: 400px) {
+            .touch-btn { width: 42px; height: 42px; }
+            .touch-btn.btn-fire { width: 50px; height: 50px; }
         }
 
         /* Footer */
