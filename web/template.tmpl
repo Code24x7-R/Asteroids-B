@@ -82,8 +82,8 @@ config = {
     autorun : {{cookiecutter.autorun}},
     PYBUILD : "{{cookiecutter.PYBUILD}}",
     fb_ar   : 1.333,
-    fb_width : "{{cookiecutter.width}}",
-    fb_height : "{{cookiecutter.height}}"
+    fb_width : "1024",
+    fb_height : "768"
 }
 
 function show_infobox() {
@@ -211,9 +211,6 @@ function show_infobox() {
             border: 2px solid var(--cyan-glow);
             box-shadow: 0 0 25px rgba(0, 255, 255, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.8);
             margin: 4px auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             border-radius: 4px;
             overflow: hidden;
         }
@@ -521,7 +518,8 @@ function show_infobox() {
     <div id="game-container">
         <!-- Pygbag Canvas -->
         <canvas class="emscripten" id="canvas" width="1024" height="768" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
-        <canvas class="emscripten" id="canvas3d" width="{{cookiecutter.width}}px" height="{{cookiecutter.height}}px" oncontextmenu="event.preventDefault()" tabindex="1" hidden></canvas>
+        <canvas class="emscripten" id="canvas3d" width="1024" height="768" oncontextmenu="event.preventDefault()" tabindex="1" hidden></canvas>
+    </div>
 
     <!-- Mobile Virtual Touch Pad -->
     <div id="touch-controls">

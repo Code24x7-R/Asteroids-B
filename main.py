@@ -112,8 +112,9 @@ else:
 
 pygame.init()
 pygame.mixer.init(frequency=44100, size=-16, channels=1, buffer=512)
-
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode(
+    (SCREEN_WIDTH, SCREEN_HEIGHT)
+)
 pygame.display.set_caption("Asteroids - 3D Holographic UIX")
 
 BLACK = (5, 5, 15)
@@ -1265,15 +1266,23 @@ class Game:
         return not is_powerup and abs(angle_diff) < 30 and self.player.pos.distance_to(target.pos) < 800 and len(self.bullets) < 5
 
     async def run(self):
+        global SCREEN_WIDTH, SCREEN_HEIGHT, screen
         running = True
         shoot_cooldown = 0
         player_hidden = False
+        frame_count = 0
         while running:
             self.time_ticker += 1
             if self.level_up_timer > 0: self.level_up_timer -= 1
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT: running = False
+                elif event.type == pygame.VIDEORESIZE:
+                    SCREEN_WIDTH, SCREEN_HEIGHT = event.w, event.h
+                    screen = pygame.display.set_mode(
+                        (SCREEN_WIDTH, SCREEN_HEIGHT),
+                        pygame.RESIZABLE
+                    )
                 elif event.type == pygame.JOYDEVICEADDED:
                     js = pygame.joystick.Joystick(event.device_index)
                     js.init()
@@ -1301,7 +1310,10 @@ class Game:
                     self.last_input_time = pygame.time.get_ticks()
                     self.demo_mode = False
                     if event.key == pygame.K_m and not self.entering_initials: SoundManager.muted = not SoundManager.muted
-                    if event.key == pygame.K_q: self.quit_flag = True
+                    if event.key == pygame.K_q:
+                        self.lives = 0
+                        self.player.alive = False
+                        self.player.kill()
                     if self.entering_initials:
                         if event.key == pygame.K_RETURN and len(self.initials) > 0:
                             self.save_score(self.initials, self.score)
@@ -1792,7 +1804,11 @@ class Game:
                     self.draw_holographic_text("PRESS 'R' TO REBOOT SYSTEM", font, GOLD, SCREEN_WIDTH//2 - 180, SCREEN_HEIGHT - 100)
 
             pygame.display.flip()
+            frame_count += 1
+            if frame_count % 60 == 0:
+                pass  # frame counter
             clock.tick(FPS)
+            await asyncio.sleep(0)
 async def main():
     global game
     game = Game()

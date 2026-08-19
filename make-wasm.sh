@@ -22,6 +22,18 @@ mkdir -p dist/web
 cp -r build/web/* dist/web/
 [ -f CNAME ] && cp CNAME dist/web/CNAME
 
+echo "[3b/4] Fetching pygame-ce WASM wheel..."
+mkdir -p dist/web/cdn/cp312
+WHEEL_URL="https://pygame-web.github.io/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
+WHEEL_PATH="dist/web/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
+if [ ! -f "$WHEEL_PATH" ]; then
+    echo "Downloading pygame_ce wheel from CDN..."
+    curl -L -o "$WHEEL_PATH" "$WHEEL_URL"
+    echo "Wheel downloaded: $WHEEL_PATH"
+else
+    echo "Wheel already exists: $WHEEL_PATH"
+fi
+
 echo "[4/4] Creating itch.io web zip archive..."
 rm -f dist/asteroids-3d-web.zip
 (cd dist/web && zip -r ../asteroids-3d-web.zip ./*)

@@ -165,7 +165,7 @@ screen = pygame.display.set_mode(
 
 pygame.display.set_caption("Asteroids - 3D Holographic UIX")
 
-BLACK = (5, 5, 15)
+BLACK = (0, 0, 0)
 CYAN = (0, 255, 255)
 MAGENTA = (255, 0, 255)
 NEON_GREEN = (57, 255, 20)
@@ -650,7 +650,7 @@ class BossBullet(EnemyBullet):
         super().__init__(pos, pos + vel)
         self.vel = pygame.math.Vector2(vel)
         self.radius = 8
-        self.life = 200
+        self.life = 150
         
     def draw(self, surface, offset):
         px, py = self.pos.x + offset.x, self.pos.y + offset.y
@@ -1832,7 +1832,7 @@ class Game:
                 screen.blit(s, (0,0))
                 self.draw_holographic_text("SYSTEM PURGED", title_font, NEON_GREEN, SCREEN_WIDTH//2 - 200, 150)
                 self.draw_holographic_text("THE GALAXY IS SAFE... FOR NOW", font, CYAN, SCREEN_WIDTH//2 - 220, 250)
-                credits_text = ["ASTEROIDS 3D HOLOGRAPHIC UIX", "", "CREATED BY", "HUMAN & AI COLLABORATION", "", "TACTICAL STEALTH MECHANICS", "GAS CLOUD DETONATION ENGINE", "COOPERATIVE SAUCER AI", "", "THANKS FOR PLAYING"]
+                credits_text = ["ASTEROIDS 3D HOLOGRAPHIC UIX", "", "CONCEIVED & CREATED BY", "HUMAN & AI COLLABORATION", "", "TACTICAL STEALTH MECHANICS", "GAS CLOUD DETONATION ENGINE", "COOPERATIVE SAUCER AI", "", "THANKS FOR PLAYING"]
                 y = 350
                 for line in credits_text:
                     self.draw_holographic_text(line, small_font, WHITE, SCREEN_WIDTH//2 - len(line)*6, y)
@@ -1842,6 +1842,7 @@ class Game:
 
             pygame.display.flip()
             clock.tick(FPS)
+            await asyncio.sleep(0)  # Allow other tasks to run
 async def main():
     global game
     game = Game()

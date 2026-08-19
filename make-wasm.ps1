@@ -43,6 +43,20 @@ if (Test-Path "CNAME") {
 Write-Host "Generated files in dist\web\:" -ForegroundColor Green
 Get-ChildItem "dist\web" | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
+# Step 4b: Fetch pygame-ce WASM wheel to local CDN directory
+Write-Host "`n[4b/5] Fetching pygame-ce WASM wheel..." -ForegroundColor Yellow
+$cdnDir = "dist\web\cdn\cp312"
+if (-not (Test-Path $cdnDir)) { New-Item -ItemType Directory -Path $cdnDir -Force | Out-Null }
+$wheelUrl = "https://pygame-web.github.io/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
+$wheelPath = "$cdnDir\pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
+if (-not (Test-Path $wheelPath)) {
+    Write-Host "Downloading pygame_ce wheel from CDN..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $wheelUrl -OutFile $wheelPath
+    Write-Host "Wheel downloaded: $wheelPath" -ForegroundColor Green
+} else {
+    Write-Host "Wheel already exists: $wheelPath" -ForegroundColor Green
+}
+
 # Step 5: Create itch.io / static web deployment zip archive
 Write-Host "`n[5/5] Packaging zip distribution for itch.io / static hosting..." -ForegroundColor Yellow
 $zipPath = "dist\asteroids-3d-web.zip"
