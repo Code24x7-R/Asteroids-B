@@ -67,84 +67,81 @@ asyncio.run( custom_site() )
 # =============================================================================
 # --></script><head>
 <script type="application/javascript">
-// Configuration for Pygbag runtime
-config = {
-    xtermjs : "{{cookiecutter.xtermjs}}",
-    _sdl2 : "canvas",
-    user_canvas : 0,
-    user_canvas_managed : 0,
-    gui_divider : 2,
-    ume_block : 0,
-    can_close : 0,
-    archive : "{{cookiecutter.archive}}",
-    gui_debug : 0,
-    cdn : "{{cookiecutter.cdn}}",
-    autorun : {{cookiecutter.autorun}},
-    PYBUILD : "{{cookiecutter.PYBUILD}}",
-    fb_ar   : 1.333,
-    fb_width : "1024",
-    fb_height : "768"
-}
-
-// Mobile-responsive canvas sizing with device pixel ratio support
-function getOptimalCanvasSize() {
-    const viewportW = window.innerWidth;
-    const viewportH = window.innerHeight;
-    const dpr = window.devicePixelRatio || 1;
-    const aspectRatio = 4 / 3;
-
-    // Reserve space for touch controls and header on mobile
-    const isMobile = viewportW < 768;
-    const reservedVSpace = isMobile ? 220 : 120; // touch controls + header
-    const availableH = viewportH - reservedVSpace;
-    const availableW = viewportW;
-
-    // Fit within available space while maintaining 4:3 aspect ratio
-    let cssWidth, cssHeight;
-    if (availableW / availableH > aspectRatio) {
-        // Width is the limiting factor
-        cssHeight = availableH;
-        cssWidth = Math.floor(availableH * aspectRatio);
-    } else {
-        // Height is the limiting factor
-        cssWidth = availableW;
-        cssHeight = Math.floor(availableW / aspectRatio);
+// Compute optimal canvas size BEFORE pygbag config (reads at module load)
+(function() {
+    function calcSize() {
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var dpr = window.devicePixelRatio || 1;
+        var isMobile = vw < 768;
+        // Reserve vertical space for touch controls + header on mobile
+        var reserved = isMobile ? 200 : 100;
+        var availH = vh - reserved;
+        var availW = vw;
+        var ar = 4 / 3;
+        var cssW, cssH;
+        // Fit maintaining 4:3 aspect ratio
+        if (availW / availH > ar) {
+            cssH = availH;
+            cssW = Math.floor(availH * ar);
+        } else {
+            cssW = availW;
+            cssH = Math.floor(availW / ar);
+        }
+        // Clamp
+        cssW = Math.max(320, Math.min(cssW, vw));
+        cssH = Math.max(240, Math.min(cssH, vh));
+        return {
+            cssW: cssW, cssH: cssH,
+            physW: Math.floor(cssW * dpr),
+            physH: Math.floor(cssH * dpr),
+            dpr: dpr
+        };
     }
 
-    // Clamp to reasonable bounds
-    cssWidth = Math.max(320, Math.min(cssWidth, 1024));
-    cssHeight = Math.max(240, Math.min(cssHeight, 768));
+    var size = calcSize();
 
-    // Physical pixels = CSS pixels × device pixel ratio
-    const physicalWidth = Math.floor(cssWidth * dpr);
-    const physicalHeight = Math.floor(cssHeight * dpr);
+    // Configuration for Pygbag runtime — sizes computed above
+    config = {
+        xtermjs : "{{cookiecutter.xtermjs}}",
+        _sdl2 : "canvas",
+        user_canvas : 0,
+        user_canvas_managed : 1,
+        gui_divider : 2,
+        ume_block : 0,
+        can_close : 0,
+        archive : "{{cookiecutter.archive}}",
+        gui_debug : 0,
+        cdn : "{{cookiecutter.cdn}}",
+        autorun : {{cookiecutter.autorun}},
+        PYBUILD : "{{cookiecutter.PYBUILD}}",
+        fb_ar : size.cssW / size.cssH,
+        fb_width : String(size.physW),
+        fb_height : String(size.physH)
+    };
 
-    return { cssWidth, cssHeight, physicalWidth, physicalHeight, dpr };
-}
-
-function applyCanvasSize() {
-    const canvas = document.getElementById('canvas');
-    if (!canvas) return;
-    const size = getOptimalCanvasSize();
-    // Set physical canvas resolution for crisp rendering
-    if (canvas.width !== size.physicalWidth || canvas.height !== size.physicalHeight) {
-        canvas.width = size.physicalWidth;
-        canvas.height = size.physicalHeight;
+    // Apply canvas physical size immediately
+    var c = document.getElementById('canvas');
+    if (c) {
+        c.width = size.physW;
+        c.height = size.physH;
     }
-    // Update config for pygbag
-    config.fb_width = String(size.physicalWidth);
-    config.fb_height = String(size.physicalHeight);
-    config.fb_ar = size.cssWidth / size.cssHeight;
-    return size;
-}
 
-// Apply on load and on resize/orientation change
-window.addEventListener('resize', applyCanvasSize);
-window.addEventListener('orientationchange', function() {
-    setTimeout(applyCanvasSize, 200);
-});
-// Initial apply after a short delay to ensure DOM is ready
-setTimeout(applyCanvasSize, 100);
+    // Resize handler for orientation changes / window resize
+    function onResize() {
+        var s = calcSize();
+        var canvas = document.getElementById('canvas');
+        if (canvas && (canvas.width !== s.physW || canvas.height !== s.physH)) {
+            canvas.width = s.physW;
+            canvas.height = s.physH;
+        }
+        config.fb_width = String(s.physW);
+        config.fb_height = String(s.physH);
+        config.fb_ar = s.cssW / s.cssH;
+    }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', function() { setTimeout(onResize, 300); });
+})();
 
 function show_infobox() {
     const infobox = document.getElementById("infobox");
