@@ -637,7 +637,7 @@ class FlyingSaucer(pygame.sprite.Sprite):
         self.total_saucers = total_saucers
         self.target = player_pos
 
-    def update(self, player_pos, all_saucers, player_hidden=False, asteroids=None, clouds=None):
+    def update(self, player_pos, all_saucers, player_hidden=False, asteroids=None, clouds=None, player_invincible=False):
         saucer_hidden = False
         if clouds:
             for cloud in clouds:
@@ -677,7 +677,22 @@ class FlyingSaucer(pygame.sprite.Sprite):
                 target_offset = pygame.math.Vector2(math.cos(flank_angle) * offset_dist, math.sin(flank_angle) * offset_dist)
                 target_pos = player_pos + target_offset
             else:
-                target_pos = player_pos
+                if player_invincible:
+                    # During player spawn immunity: maintain standoff distance (orbit)
+                    standoff_dist = 200
+                    to_player = self.pos - player_pos
+                    dist_to_player = to_player.length()
+                    if dist_to_player > 1:
+                        angle = math.atan2(to_player.y, to_player.x)
+                        angle += 0.02  # slow orbital drift
+                        target_pos = player_pos + pygame.math.Vector2(
+                            math.cos(angle) * standoff_dist,
+                            math.sin(angle) * standoff_dist
+                        )
+                    else:
+                        target_pos = player_pos + pygame.math.Vector2(standoff_dist, 0)
+                else:
+                    target_pos = player_pos
             self.target = player_pos
 
         to_target = target_pos - self.pos
@@ -1375,7 +1390,7 @@ class Game:
                                 player_hidden = True
                                 break
 
-                    self.saucers.update(self.player.pos, list(self.saucers), player_hidden, list(self.asteroids), list(self.clouds))
+                    self.saucers.update(self.player.pos, list(self.saucers), player_hidden, list(self.asteroids), list(self.clouds), self.player.invincible_timer > 0)
                     self.enemy_bullets.update()
                     self.powerups.update()
                     self.clouds.update()
