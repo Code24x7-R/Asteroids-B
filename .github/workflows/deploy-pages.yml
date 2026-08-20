@@ -38,6 +38,13 @@ jobs:
           mkdir -p dist/web
           cp -r build/web/* dist/web/
           if [ -f CNAME ]; then cp CNAME dist/web/CNAME; fi
+      - name: Inject git commit hash into HUD
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          for html in dist/web/*.html; do
+              [ -f "$html" ] && sed -i "s/GIT: unknown/GIT: $COMMIT_HASH/g" "$html"
+          done
+          echo "Injected commit: $COMMIT_HASH"
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
