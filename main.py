@@ -1280,12 +1280,68 @@ class Game:
         if abs(angle_diff) < 60: self.player.is_thrusting = True
         return not is_powerup and abs(angle_diff) < 30 and self.player.pos.distance_to(target.pos) < 800 and len(self.bullets) < 5
 
+    def _create_scanlines_surface(self):
+        """Pre-render scanlines to a surface (256 draw calls -> 1 blit)."""
+        surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for y in range(0, SCREEN_HEIGHT, 4):
+            pygame.draw.line(surf, (0, 0, 0, 40), (0, y), (SCREEN_WIDTH, y), 1)
+        return surf
+
+    def _create_vignette_surface(self):
+        """Pre-render vignette to a surface (100 draw calls -> 1 blit)."""
+        surf = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        for i in range(100):
+            pygame.draw.rect(surf, (0, 0, 5, int(30 * (i / 100))), (i, i, SCREEN_WIDTH - 2*i, SCREEN_HEIGHT - 2*i), 1)
+        return surf
+
+    def _asteroid_collisions(self, ast_list):
+        """Spatial-hash collision detection: O(n) average instead of O(n^2).
+        Only checks asteroids in the same or adjacent grid cells."""
+        cell_size = 120  # >= max collision distance (large+large = 100px)
+        grid = {}
+        for ast in ast_list:
+            cx = int(ast.pos.x / cell_size)
+            cy = int(ast.pos.y / cell_size)
+            key = (cx, cy)
+            if key not in grid:
+                grid[key] = []
+            grid[key].append(ast)
+
+        checked = set()
+        for (cx, cy), cell_asts in grid.items():
+            # Gather candidates from this cell + neighbors
+            candidates = []
+            for dx in range(-1, 2):
+                for dy in range(-1, 2):
+                    nkey = (cx + dx, cy + dy)
+                    if nkey in grid:
+                        candidates.extend(grid[nkey])
+            # Check collisions within this cell's asteroids vs candidates
+            for ast in cell_asts:
+                id_a = id(ast)
+                for other in candidates:
+                    if ast is other:
+                        continue
+                    id_b = id(other)
+                    pair = (id_a, id_b) if id_a < id_b else (id_b, id_a)
+                    if pair in checked:
+                        continue
+                    checked.add(pair)
+                    if ast.pos.distance_to(other.pos) < ast.radius + other.radius:
+                        resolve_asteroid_collision(ast, other)
+                        self.sounds.play(self.sounds.snd_collision)
+
     async def run(self):
         global SCREEN_WIDTH, SCREEN_HEIGHT, screen
         running = True
         shoot_cooldown = 0
         player_hidden = False
         frame_count = 0
+
+        # Pre-render static overlays once
+        scanlines_surf = self._create_scanlines_surface()
+        vignette_surf = self._create_vignette_surface()
+
         while running:
             self.time_ticker += 1
             if self.level_up_timer > 0: self.level_up_timer -= 1
@@ -1483,13 +1539,7 @@ class Game:
                                         pull = 200 / (dist ** 1.2) * grav_mult
                                         sauc.vel += dist_vec.normalize() * pull * 0.1
 
-                    ast_list = list(self.asteroids)
-                    for i in range(len(ast_list)):
-                        for j in range(i + 1, len(ast_list)):
-                            if ast_list[i] not in self.asteroids or ast_list[j] not in self.asteroids: continue
-                            if ast_list[i].pos.distance_to(ast_list[j].pos) < ast_list[i].radius + ast_list[j].radius:
-                                resolve_asteroid_collision(ast_list[i], ast_list[j])
-                                self.sounds.play(self.sounds.snd_collision)
+                    self._asteroid_collisions(list(self.asteroids))
 
                     self.saucer_timer -= 1
                     if self.saucer_timer <= 0 and len(self.saucers) == 0 and not self.boss_fight:
@@ -1533,10 +1583,16 @@ class Game:
                             self.spawn_level()
 
                     # --- COLLISION: Bullets pass freely through GasClouds (no collision) ---
+                    # Cache lists once per frame (avoid repeated list() allocation in inner loops)
+                    bullet_list = list(self.bullets)
+                    ebullet_list = list(self.enemy_bullets)
+                    asteroid_list = list(self.asteroids)
+                    saucer_list = list(self.saucers)
+
                     # Bullets vs Enemy Bullets (Interception)
-                    for bullet in list(self.bullets):
+                    for bullet in bullet_list:
                         if bullet not in self.bullets: continue
-                        for ebullet in list(self.enemy_bullets):
+                        for ebullet in ebullet_list:
                             if ebullet not in self.enemy_bullets: continue
                             if bullet.pos.distance_to(ebullet.pos) < bullet.radius + ebullet.radius + 4:
                                 self.score += 10 * self.player.score_multiplier
@@ -1548,10 +1604,10 @@ class Game:
                                 break
 
                     # Enemy bullets vs Saucers (Friendly Fire)
-                    for ebullet in list(self.enemy_bullets):
+                    for ebullet in ebullet_list:
                         if ebullet not in self.enemy_bullets: continue
                         if isinstance(ebullet, BossBullet): continue
-                        for saucer in list(self.saucers):
+                        for saucer in saucer_list:
                             if saucer not in self.saucers: continue
                             if ebullet.life < 90 and saucer.pos.distance_to(ebullet.pos) < saucer.radius + ebullet.radius + 5:
                                 if circle_polygon_intersection(ebullet.pos, ebullet.radius, saucer.get_collision_polygon(self.shake_offset)):
@@ -1566,9 +1622,9 @@ class Game:
                                     break
 
                     # Bullets vs Asteroids
-                    for bullet in list(self.bullets):
+                    for bullet in bullet_list:
                         if bullet not in self.bullets: continue
-                        for asteroid in list(self.asteroids):
+                        for asteroid in asteroid_list:
                             if asteroid not in self.asteroids: continue
                             if asteroid.collides_with_line(bullet.pos - bullet.vel * 1.5, bullet.pos, self.shake_offset) or asteroid.collides_with_circle(bullet.pos, bullet.radius, self.shake_offset):
                                 self.split_asteroid(asteroid)
@@ -1577,7 +1633,7 @@ class Game:
 
                     # Bullets vs Boss
                     if self.boss_fight and self.boss and self.boss.alive:
-                        for bullet in list(self.bullets):
+                        for bullet in bullet_list:
                             if bullet not in self.bullets: continue
                             if self.boss.pos.distance_to(bullet.pos) < self.boss.radius + 10 and circle_polygon_intersection(bullet.pos, bullet.radius, self.boss.get_collision_polygon(self.shake_offset)):
                                 if self.boss.invulnerable_timer > 0 or self.boss.entering:
@@ -1592,9 +1648,9 @@ class Game:
                                         self.particles.add(Particle(bullet.pos, pygame.math.Vector2(random.uniform(-2,2), random.uniform(-2,2)), YELLOW, 15, 2, projected=True))
 
                     # Enemy bullets vs Asteroids
-                    for ebullet in list(self.enemy_bullets):
+                    for ebullet in ebullet_list:
                         if ebullet not in self.enemy_bullets: continue
-                        for asteroid in list(self.asteroids):
+                        for asteroid in asteroid_list:
                             if asteroid not in self.asteroids: continue
                             if asteroid.collides_with_circle(ebullet.pos, ebullet.radius, self.shake_offset):
                                 ebullet.kill()
@@ -1604,9 +1660,9 @@ class Game:
                                 break
 
                     # Bullets vs Saucer
-                    for bullet in list(self.bullets):
+                    for bullet in bullet_list:
                         if bullet not in self.bullets: continue
-                        for saucer in list(self.saucers):
+                        for saucer in saucer_list:
                             if saucer not in self.saucers: continue
                             if saucer.pos.distance_to(bullet.pos) < saucer.radius + 10 and circle_polygon_intersection(bullet.pos, bullet.radius, saucer.get_collision_polygon(self.shake_offset)):
                                 self.score += 200 * self.player.score_multiplier
@@ -1621,9 +1677,9 @@ class Game:
                                 break
 
                     # Saucer vs Asteroid
-                    for saucer in list(self.saucers):
+                    for saucer in saucer_list:
                         if saucer not in self.saucers: continue
-                        for asteroid in list(self.asteroids):
+                        for asteroid in asteroid_list:
                             if asteroid not in self.asteroids: continue
                             if saucer.pos.distance_to(asteroid.pos) < saucer.radius + asteroid.radius:
                                 self.sounds.play(self.sounds.snd_explode)
@@ -1646,7 +1702,7 @@ class Game:
                     # Enemy bullets vs Player
                     if self.player.alive:
                         player_poly = self.player.get_collision_polygon()
-                        for ebullet in list(self.enemy_bullets):
+                        for ebullet in ebullet_list:
                             if ebullet not in self.enemy_bullets: continue
                             if circle_polygon_intersection(ebullet.pos, ebullet.radius, player_poly):
                                 if self.player.shield_hits > 0:
@@ -1690,7 +1746,7 @@ class Game:
                     # Player vs Asteroids
                     if self.player.alive and self.player.invincible_timer <= 0:
                         player_poly = self.player.get_collision_polygon()
-                        for asteroid in list(self.asteroids):
+                        for asteroid in asteroid_list:
                             if asteroid not in self.asteroids: continue
                             if self.player.pos.distance_to(asteroid.pos) < asteroid.radius + self.player.radius + 10 and asteroid.collides_with_polygon(player_poly, self.shake_offset):
                                 if self.player.shield_hits > 0:
@@ -1719,6 +1775,10 @@ class Game:
                         self.credits_timer = 600
                         self.boss_fight = False
                         self.boss = None
+
+                    # Yield to browser event loop mid-frame on busy levels
+                    # so input events get processed even during heavy collision
+                    await asyncio.sleep(0)
                         
             elif self.game_state == 'CREDITS':
                 self.particles.update()
@@ -1754,11 +1814,8 @@ class Game:
 
                 for cloud in self.clouds: cloud.draw(screen, self.shake_offset)
 
-                for y in range(0, SCREEN_HEIGHT, 4): pygame.draw.line(screen, (0, 0, 0), (0, y), (SCREEN_WIDTH, y), 1)
-                vignette = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-                for i in range(100):
-                    pygame.draw.rect(vignette, (0, 0, 5, int(30 * (i / 100))), (i, i, SCREEN_WIDTH - 2*i, SCREEN_HEIGHT - 2*i), 1)
-                screen.blit(vignette, (0, 0))
+                screen.blit(scanlines_surf, (0, 0))
+                screen.blit(vignette_surf, (0, 0))
 
                 self.draw_holographic_text(f"SCORE :: {self.score}", font, CYAN, 20, 20)
                 self.draw_holographic_text(f"LEVEL :: {self.level}", small_font, NEON_GREEN, 20, 60)
