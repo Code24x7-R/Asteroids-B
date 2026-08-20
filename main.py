@@ -748,12 +748,12 @@ class FlyingSaucer(pygame.sprite.Sprite):
 class BossSaucer(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.radius = 220
-        self.hp = 50
-        self.max_hp = 50
+        self.radius = 180
+        self.hp = 40
+        self.max_hp = 40
         self.alive = True
         self.angle = 0
-        self.max_speed = 3.0
+        self.max_speed = 2.0
         
         side = random.choice(['top', 'bottom', 'left', 'right'])
         if side == 'top': self.pos = pygame.math.Vector2(SCREEN_WIDTH/2, -self.radius)
@@ -811,16 +811,16 @@ class BossSaucer(pygame.sprite.Sprite):
             if diff > 180: diff -= 360
             self.angle += diff * 0.1
         self.attack_timer += 1
-        if player_hidden and self.attack_timer % 70 == 0:
+        if player_hidden and self.attack_timer % 90 == 0:
             return "ring"
         if self.hp < self.max_hp / 2:
-            if self.attack_timer % 35 == 0: return "spread"
-            if self.attack_timer % 120 == 0: return "ring"
-            if self.attack_timer % 250 == 0: return "singularity"
+            if self.attack_timer % 50 == 0: return "spread"
+            if self.attack_timer % 150 == 0: return "ring"
+            if self.attack_timer % 300 == 0: return "singularity"
         else:
-            if self.attack_timer % 70 == 0: return "spread"
-            if self.attack_timer % 180 == 0: return "ring"
-            if self.attack_timer % 400 == 0: return "singularity"
+            if self.attack_timer % 90 == 0: return "spread"
+            if self.attack_timer % 220 == 0: return "ring"
+            if self.attack_timer % 450 == 0: return "singularity"
         return None
 
     def take_damage(self, amount, particles, sounds):
@@ -866,6 +866,35 @@ class BossSaucer(pygame.sprite.Sprite):
         dome_radius = self.radius * 0.45
         pygame.draw.circle(surface, (200, 50, 50), (int(dome_center.x), int(dome_center.y)), int(dome_radius))
         pygame.draw.circle(surface, (255, 100, 100), (int(dome_center.x), int(dome_center.y)), int(dome_radius), 4)
+        # Wicked evil smile
+        smile_width = dome_radius * 0.8
+        smile_y = dome_center.y + dome_radius * 0.15
+        smile_depth = dome_radius * 0.3
+        smile_points = []
+        steps = 12
+        for i in range(steps + 1):
+            t = i / steps  # 0 to 1
+            x = dome_center.x - smile_width/2 + smile_width * t
+            # Parabola: middle rises up (smaller y)
+            arc = (1 - (2*t - 1)**2)  # 0 at ends, 1 in middle
+            y = smile_y - smile_depth * arc
+            smile_points.append((int(x), int(y)))
+        pygame.draw.lines(surface, (80, 0, 0), False, smile_points, 5)
+        pygame.draw.lines(surface, (200, 0, 0), False, smile_points, 2)
+        # Fang points at corners for evil look
+        fang_size = dome_radius * 0.12
+        left_corner = smile_points[0]
+        right_corner = smile_points[-1]
+        pygame.draw.polygon(surface, (80, 0, 0), [
+            left_corner,
+            (left_corner[0] - fang_size*0.3, left_corner[1] + fang_size),
+            (left_corner[0] + fang_size*0.7, left_corner[1] + fang_size*0.5)
+        ])
+        pygame.draw.polygon(surface, (80, 0, 0), [
+            right_corner,
+            (right_corner[0] + fang_size*0.3, right_corner[1] + fang_size),
+            (right_corner[0] - fang_size*0.7, right_corner[1] + fang_size*0.5)
+        ])
         pulse_core = math.sin(pygame.time.get_ticks() * 0.005) * 0.3 + 0.7
         core_radius = int(self.radius * 0.2 * pulse_core)
         glow = pygame.Surface((core_radius*4, core_radius*4), pygame.SRCALPHA)
@@ -1107,6 +1136,7 @@ class Game:
         self.boss = None
         self.game_state = 'PLAYING'
         self.credits_timer = 0
+        self.player_ghosts = []  # dead player sprites pulled into boss accretion disk
         self.spawn_level()
 
     def rumble(self, low=0.5, high=0.5, duration=200):
@@ -1233,6 +1263,45 @@ class Game:
                 break
         self.powerups.add(Powerup(pos if pos else (SCREEN_WIDTH/2, SCREEN_HEIGHT/2)))
         self.all_sprites.add(self.powerups.sprites()[-1])
+
+    def record_player_ghost(self):
+        """Capture the player's current ship shape as a ghost to be pulled into the boss."""
+        if self.boss_fight and self.boss and self.boss.alive:
+            self.player_ghosts.append({
+                'pos': pygame.math.Vector2(self.player.pos),
+                'angle': self.player.angle,
+                'alpha': 255,
+                'scale': 1.0,
+            })
+
+    def draw_ghosts(self, surface, offset):
+        """Draw dead player ships being pulled into the boss accretion disk."""
+        if not self.boss_fight or not self.boss or not self.boss.alive:
+            return
+        boss_pos = self.boss.pos + offset
+        for ghost in self.player_ghosts:
+            # Spiral inward toward boss center
+            to_boss = self.boss.pos - ghost['pos']
+            dist = to_boss.length()
+            if dist > 5:
+                pull = to_boss.normalize() * min(dist * 0.02, 3)
+                perp = pygame.math.Vector2(-to_boss.y, to_boss.x).normalize() * 1.2 if dist > 0 else pygame.math.Vector2(0, 0)
+                ghost['pos'] += pull + perp
+                ghost['angle'] += 3
+                ghost['alpha'] = max(40, ghost['alpha'] - 0.5)
+                ghost['scale'] = max(0.3, ghost['scale'] - 0.003)
+            gpos = ghost['pos'] + offset
+            # Draw faded ship shape
+            rad = math.radians(ghost['angle'])
+            s = ghost['scale']
+            pts = []
+            for x, y in [(0, -20*s), (-12*s, 15*s), (0, 8*s), (12*s, 15*s)]:
+                rx = x * math.cos(rad) - y * math.sin(rad)
+                ry = x * math.sin(rad) + y * math.cos(rad)
+                pts.append((gpos.x + rx, gpos.y + ry))
+            ghost_color = (0, int(150 * ghost['alpha'] / 255), int(150 * ghost['alpha'] / 255))
+            pygame.draw.polygon(surface, ghost_color, pts)
+            pygame.draw.polygon(surface, (0, int(255 * ghost['alpha'] / 255), int(255 * ghost['alpha'] / 255)), pts, 1)
 
     def draw_stars(self, surface, offset):
         for star in self.stars:
@@ -1500,8 +1569,8 @@ class Game:
                             self.boss.singularity_timer = 120
                             self.sounds.play(self.sounds.snd_boss_pulse)
                         if not self.boss.entering:
-                            gravity_radius = self.boss.radius * 4.5
-                            event_horizon = self.boss.radius * 0.7
+                            gravity_radius = self.boss.radius * 2.8
+                            event_horizon = self.boss.radius * 0.5
                             grav_mult = 3.0 if self.boss.is_singularity_active else 1.0
                             if self.player.alive:
                                 dist_vec = self.boss.pos - self.player.pos
@@ -1509,12 +1578,13 @@ class Game:
                                 if dist < gravity_radius:
                                     if dist < event_horizon:
                                         if self.player.invincible_timer <= 0 and self.player.shield_hits <= 0:
+                                            self.record_player_ghost()
                                             self.player.explode(self.particles, self.sounds)
                                             self.lives -= 1
                                             self.shake_amount = 30
                                     else:
-                                        pull = 400 / (dist ** 1.2) * grav_mult
-                                        self.player.vel += dist_vec.normalize() * pull * 0.05
+                                        pull = 250 / (dist ** 1.3) * grav_mult
+                                        self.player.vel += dist_vec.normalize() * pull * 0.04
                             for ast in list(self.asteroids):
                                 dist_vec = self.boss.pos - ast.pos
                                 dist = dist_vec.length()
@@ -1710,6 +1780,7 @@ class Game:
                     if self.boss_fight and self.boss and self.boss.alive and self.player.alive:
                         if self.boss.pos.distance_to(self.player.pos) < self.boss.radius + self.player.radius:
                             if self.player.invincible_timer <= 0 and self.player.shield_hits <= 0:
+                                self.record_player_ghost()
                                 self.player.explode(self.particles, self.sounds)
                                 self.lives -= 1
 
@@ -1728,6 +1799,7 @@ class Game:
                                         self.particles.add(Particle(ebullet.pos, pygame.math.Vector2(math.cos(random.uniform(0, math.pi*2)) * random.uniform(1, 3), math.sin(random.uniform(0, math.pi*2)) * random.uniform(1, 3)), GREEN, random.randint(10, 20), 2, projected=True))
                                     continue
                                 if self.player.invincible_timer <= 0:
+                                    self.record_player_ghost()
                                     self.player.explode(self.particles, self.sounds)
                                     self.rumble(1.0, 0.8, 500)
                                     self.shake_amount = 25
@@ -1771,6 +1843,7 @@ class Game:
                                         self.particles.add(Particle(asteroid.pos, pygame.math.Vector2(math.cos(random.uniform(0, math.pi*2)) * random.uniform(1, 3), math.sin(random.uniform(0, math.pi*2)) * random.uniform(1, 3)), GREEN, random.randint(10, 20), 2, projected=True))
                                     asteroid.pos += (asteroid.pos - self.player.pos).normalize() * 30
                                     continue
+                                self.record_player_ghost()
                                 self.player.explode(self.particles, self.sounds)
                                 self.rumble(1.0, 0.8, 500)
                                 self.shake_amount = 25
@@ -1827,6 +1900,9 @@ class Game:
                         item[2].draw(screen, self.shake_offset)
 
                 for cloud in self.clouds: cloud.draw(screen, self.shake_offset)
+
+                # Draw dead player ghosts being pulled into the boss
+                self.draw_ghosts(screen, self.shake_offset)
 
                 screen.blit(scanlines_surf, (0, 0))
                 screen.blit(vignette_surf, (0, 0))
