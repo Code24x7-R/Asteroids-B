@@ -637,24 +637,28 @@ class FlyingSaucer(pygame.sprite.Sprite):
         self.total_saucers = total_saucers
         self.target = player_pos
 
-    def update(self, player_pos, all_saucers, player_hidden=False, asteroids=None, clouds=None, player_invincible=False):
+    @staticmethod
+    def _is_hidden(pos, clouds):
+        """Check if a position is inside any gas cloud."""
+        for cloud in clouds:
+            if pos.distance_to(cloud.pos) < (cloud.size // 2) + 20:
+                return True
+        return False
+
+    def update(self, player_pos, all_saucers, player_hidden=False, asteroids=None, clouds=None, player_invincible=False, hidden_asteroids=None):
+        # saucer_hidden: check if this saucer is inside any cloud
         saucer_hidden = False
         if clouds:
-            for cloud in clouds:
-                if self.pos.distance_to(cloud.pos) < (cloud.size // 2) + 20:
-                    saucer_hidden = True
-                    break
+            saucer_hidden = self._is_hidden(self.pos, clouds)
+
+        # Precompute hidden set once per frame (done by caller)
+        # hidden_asteroids is a set of asteroid ids that are inside clouds
+        hidden_set = hidden_asteroids if hidden_asteroids is not None else set()
 
         avoid_vel = pygame.math.Vector2(0, 0)
         if asteroids:
             for asteroid in asteroids:
-                ast_hidden = False
-                if clouds:
-                    for cloud in clouds:
-                        if asteroid.pos.distance_to(cloud.pos) < (cloud.size // 2) + 20:
-                            ast_hidden = True
-                            break
-                if saucer_hidden or ast_hidden:
+                if saucer_hidden or id(asteroid) in hidden_set:
                     continue
                 dist_to_ast = self.pos.distance_to(asteroid.pos)
                 avoid_radius = self.radius + asteroid.radius + 80
@@ -1042,6 +1046,9 @@ class GasCloud(pygame.sprite.Sprite):
     def draw(self, surface, offset):
         x = int(self.pos.x + offset.x - self.size // 2)
         y = int(self.pos.y + offset.y - self.size // 2)
+        # Off-screen culling: skip if entirely outside viewport
+        if x + self.size < 0 or y + self.size < 0 or x > SCREEN_WIDTH or y > SCREEN_HEIGHT:
+            return
         if self.flash_state == 0:
             surface.blit(self.dark_surface, (x, y))
         else:
@@ -1446,7 +1453,14 @@ class Game:
                                 player_hidden = True
                                 break
 
-                    self.saucers.update(self.player.pos, list(self.saucers), player_hidden, list(self.asteroids), list(self.clouds), self.player.invincible_timer > 0)
+                    # Precompute which asteroids are hidden by clouds (O(A*C) once, not O(S*A*C))
+                    hidden_asteroids = set()
+                    if self.clouds:
+                        for ast in self.asteroids:
+                            if Saucer._is_hidden(ast.pos, list(self.clouds)):
+                                hidden_asteroids.add(id(ast))
+
+                    self.saucers.update(self.player.pos, list(self.saucers), player_hidden, list(self.asteroids), list(self.clouds), self.player.invincible_timer > 0, hidden_asteroids)
                     self.enemy_bullets.update()
                     self.powerups.update()
                     self.clouds.update()
