@@ -99,6 +99,71 @@ config = {
     fb_height : "768"
 }
 
+// Compute optimal canvas size based on viewport
+(function() {
+    function computeSize() {
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var isLandscape = vw > vh;
+        var isMobile = vw < 768 || vh < 500;
+        var ar = 4 / 3;
+        var cssW, cssH;
+
+        if (isMobile && isLandscape) {
+            // Landscape mobile: full screen (controls overlay)
+            cssW = vw;
+            cssH = vh;
+        } else if (isMobile) {
+            // Portrait mobile: reserve space for header + touch controls
+            var reserved = 180;
+            var availH = vh - reserved;
+            var availW = vw;
+            if (availW / availH > ar) {
+                cssH = availH;
+                cssW = Math.floor(availH * ar);
+            } else {
+                cssW = availW;
+                cssH = Math.floor(availW / ar);
+            }
+        } else {
+            // Desktop: fill viewport, reserve ~120px for header/footer
+            var reserved = 120;
+            var availH = vh - reserved;
+            var availW = vw;
+            if (availW / availH > ar) {
+                cssH = availH;
+                cssW = Math.floor(availH * ar);
+            } else {
+                cssW = availW;
+                cssH = Math.floor(availW / ar);
+            }
+            // Cap at 1600x1200 for very large monitors
+            cssW = Math.min(cssW, 1600);
+            cssH = Math.min(cssH, 1200);
+        }
+
+        // Clamp minimums
+        cssW = Math.max(640, Math.min(cssW, vw));
+        cssH = Math.max(480, Math.min(cssH, vh));
+
+        return { cssW: cssW, cssH: cssH };
+    }
+
+    function applySize() {
+        var size = computeSize();
+        var container = document.getElementById('game-container');
+        if (container) {
+            container.style.maxWidth = size.cssW + 'px';
+            container.style.height = size.cssH + 'px';
+        }
+    }
+
+    // Apply immediately and on resize
+    applySize();
+    window.addEventListener('resize', applySize);
+    window.addEventListener('orientationchange', function() { setTimeout(applySize, 300); });
+})();
+
 // Fallback canvas sizing if pygbag's window_canvas_adjust fails
 (function() {
     function fallbackResize() {
@@ -273,8 +338,7 @@ function show_infobox() {
         #game-container {
             position: relative;
             width: 100%;
-            max-width: 1024px;
-            aspect-ratio: 4 / 3;
+            /* max-width and height set by JS computeSize() */
             background: #020208;
             border: 2px solid var(--cyan-glow);
             box-shadow: 0 0 25px rgba(0, 255, 255, 0.25), inset 0 0 15px rgba(0, 0, 0, 0.8);
@@ -283,11 +347,9 @@ function show_infobox() {
             overflow: hidden;
         }
 
-        /* Mobile portrait: fill width, keep aspect ratio */
-        @media (max-width: 768px) and (orientation: portrait) {
+        /* Mobile: JS sets dimensions directly */
+        @media (max-width: 768px) {
             #game-container {
-                max-width: 100vw;
-                width: 100vw;
                 margin: 0 auto;
                 border-radius: 0;
                 border-left: none;
@@ -295,15 +357,9 @@ function show_infobox() {
             }
         }
 
-        /* Mobile landscape: fill entire screen */
         @media (max-width: 768px) and (orientation: landscape) {
             #game-container {
-                width: 100vw;
-                height: 100vh;
-                aspect-ratio: auto;
-                margin: 0;
                 border: none;
-                border-radius: 0;
             }
         }
 
