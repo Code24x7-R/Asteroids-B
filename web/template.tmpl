@@ -137,9 +137,7 @@ config = {
                 cssW = availW;
                 cssH = Math.floor(availW / ar);
             }
-            // Cap at 1600x1200 for very large monitors
-            cssW = Math.min(cssW, 1600);
-            cssH = Math.min(cssH, 1200);
+            // No fixed cap — viewport clamping below handles 4K+
         }
 
         // Clamp minimums
