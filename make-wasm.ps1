@@ -43,7 +43,17 @@ if (Test-Path "CNAME") {
 Write-Host "Generated files in dist\web\:" -ForegroundColor Green
 Get-ChildItem "dist\web" | Select-Object Name, Length, LastWriteTime | Format-Table -AutoSize
 
-# Step 4b: Fetch pygame-ce WASM wheel to local CDN directory
+# Step 4b: Inject git commit hash into built HTML
+Write-Host "`n[4b/5] Injecting git commit hash into build..." -ForegroundColor Yellow
+$commitHash = (git rev-parse --short HEAD 2>$null) ?? "unknown"
+Get-ChildItem "dist\web\*.html" | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    $content = $content -replace 'GIT: unknown', "GIT: $commitHash"
+    Set-Content $_.FullName $content -NoNewline
+}
+Write-Host "Commit hash injected: $commitHash" -ForegroundColor Green
+
+# Step 4c: Fetch pygame-ce WASM wheel to local CDN directory
 Write-Host "`n[4b/5] Fetching pygame-ce WASM wheel..." -ForegroundColor Yellow
 $cdnDir = "dist\web\cdn\cp312"
 if (-not (Test-Path $cdnDir)) { New-Item -ItemType Directory -Path $cdnDir -Force | Out-Null }

@@ -22,7 +22,14 @@ mkdir -p dist/web
 cp -r build/web/* dist/web/
 [ -f CNAME ] && cp CNAME dist/web/CNAME
 
-echo "[3b/4] Fetching pygame-ce WASM wheel..."
+echo "[3b/4] Injecting git commit hash into build..."
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+for html in dist/web/*.html; do
+    [ -f "$html" ] && sed -i "s/GIT: unknown/GIT: $COMMIT_HASH/g" "$html"
+done
+echo "Commit hash injected: $COMMIT_HASH"
+
+echo "[3c/4] Fetching pygame-ce WASM wheel..."
 mkdir -p dist/web/cdn/cp312
 WHEEL_URL="https://pygame-web.github.io/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
 WHEEL_PATH="dist/web/cdn/cp312/pygame_ce-2.5.7-cp312-cp312-wasm32_bi_emscripten.whl"
