@@ -1125,6 +1125,7 @@ class Game:
         self.boss = None
         self.game_state = 'PLAYING'
         self.credits_timer = 0
+        self._pending_cloud_spawns = 0  # clouds queued for one-per-frame spawning
         self.spawn_level()
 
     def rumble(self, low=0.5, high=0.5, duration=200):
@@ -1142,8 +1143,9 @@ class Game:
         if self.level >= 4:
             desired = min(2 + (self.level - 4), 5)
             if len(self.clouds) < desired:
-                for _ in range(desired - len(self.clouds)):
-                    self.clouds.add(GasCloud())
+                # Queue clouds to spawn one-per-frame so the browser main
+                # thread isn't blocked by N surface inits in a single frame.
+                self._pending_cloud_spawns += desired - len(self.clouds)
 
     def load_scores(self):
         scores = []
@@ -1355,6 +1357,12 @@ class Game:
                             self.spawn_level()
 
             if self.quit_flag: break
+
+            # Spawn queued gas clouds one-per-frame to avoid blocking
+            # the browser main thread with N surface inits in one frame.
+            if self._pending_cloud_spawns > 0:
+                self._pending_cloud_spawns -= 1
+                self.clouds.add(GasCloud())
 
             if self.game_state == 'PLAYING':
                 if not self.game_over:
