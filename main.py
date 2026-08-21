@@ -1419,6 +1419,13 @@ class Game:
         vignette_surf = self._create_vignette_surface()
 
         while running:
+            # Yield to browser event loop BEFORE heavy game logic so the
+            # browser can process pending events even when a frame does
+            # expensive synchronous work (e.g. GasCloud surface init at
+            # level 4+ allocates two large SRCALPHA surfaces with hundreds
+            # of draw calls — blocks for hundreds of ms on iPhone WASM).
+            await asyncio.sleep(0)
+
             self.time_ticker += 1
             if self.level_up_timer > 0: self.level_up_timer -= 1
 
