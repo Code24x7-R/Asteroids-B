@@ -962,7 +962,10 @@ class Powerup(pygame.sprite.Sprite):
 class GasCloud(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        base_size = min(SCREEN_WIDTH, SCREEN_HEIGHT) * random.uniform(0.5, 1.1)
+        # Cap surface size: large enough to look good, small enough to avoid
+        # blocking the WASM main thread (original was up to ~1.1x screen = ~495
+        # draw calls per cloud; this is ~60 draw calls at capped 256px).
+        base_size = min(min(SCREEN_WIDTH, SCREEN_HEIGHT) * random.uniform(0.5, 1.1), 256)
         self.size = int(base_size)
         self.pos = pygame.math.Vector2(random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT))
         self.vel = pygame.math.Vector2(random.uniform(-0.15, 0.15), random.uniform(-0.15, 0.15))
@@ -970,48 +973,37 @@ class GasCloud(pygame.sprite.Sprite):
         max_radius = self.size // 2
 
         self.dark_surface = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-        core_max_r = int(max_radius * 0.75)
-        for _ in range(60):
-            r = random.randint(int(core_max_r * 0.3), core_max_r)
-            max_dist = int(max_radius * 0.9) - r
-            if max_dist > 0:
-                angle = random.uniform(0, math.pi * 2)
-                dist = random.uniform(0, max_dist)
-                pygame.draw.circle(self.dark_surface, (random.randint(5, 30), random.randint(5, 30), random.randint(15, 50), random.randint(180, 255)), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
-        for _ in range(15):
-            r = random.randint(int(max_radius * 0.1), int(max_radius * 0.3))
-            max_dist = int(max_radius * 0.6) - r
-            if max_dist > 0:
-                angle = random.uniform(0, math.pi * 2)
-                dist = random.uniform(0, max_dist)
-                pygame.draw.circle(self.dark_surface, (0, 0, 10, 255), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
-
         self.lit_surface = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-        for _ in range(60):
+        core_max_r = int(max_radius * 0.75)
+
+        # ~60 total draw calls (was ~495): fewer, larger, softer blobs
+        for _ in range(20):
             r = random.randint(int(core_max_r * 0.3), core_max_r)
-            max_dist = int(max_radius * 0.9) - r
-            if max_dist > 0:
-                angle = random.uniform(0, math.pi * 2)
-                dist = random.uniform(0, max_dist)
-                pygame.draw.circle(self.lit_surface, (random.randint(40, 80), random.randint(50, 90), random.randint(80, 120), random.randint(60, 120)), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
-        for _ in range(10):
+            angle = random.uniform(0, math.pi * 2)
+            dist = random.uniform(0, int(max_radius * 0.9) - r)
+            pygame.draw.circle(self.dark_surface, (random.randint(5, 30), random.randint(5, 30), random.randint(15, 50), random.randint(180, 255)), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
+        for _ in range(8):
+            r = random.randint(int(max_radius * 0.1), int(max_radius * 0.3))
+            angle = random.uniform(0, math.pi * 2)
+            dist = random.uniform(0, int(max_radius * 0.6) - r)
+            pygame.draw.circle(self.dark_surface, (0, 0, 10, 255), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
+        for _ in range(15):
+            r = random.randint(int(core_max_r * 0.3), core_max_r)
+            angle = random.uniform(0, math.pi * 2)
+            dist = random.uniform(0, int(max_radius * 0.9) - r)
+            pygame.draw.circle(self.lit_surface, (random.randint(40, 80), random.randint(50, 90), random.randint(80, 120), random.randint(60, 120)), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
+        for _ in range(5):
             r = random.randint(int(max_radius * 0.1), int(max_radius * 0.25))
-            max_dist = int(max_radius * 0.5) - r
-            if max_dist > 0:
-                angle = random.uniform(0, math.pi * 2)
-                dist = random.uniform(0, max_dist)
-                pygame.draw.circle(self.lit_surface, (150, 180, 255, 50), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
-        for _ in range(50):
+            angle = random.uniform(0, math.pi * 2)
+            dist = random.uniform(0, int(max_radius * 0.5) - r)
+            pygame.draw.circle(self.lit_surface, (150, 180, 255, 50), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), r)
+        for _ in range(12):
             r = random.randint(int(max_radius * 0.15), int(max_radius * 0.35))
             angle = random.uniform(0, math.pi * 2)
             dist = random.uniform(int(max_radius * 0.65), int(max_radius * 0.92))
             x, y = center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))
             pygame.draw.circle(self.dark_surface, (10, 15, 30, random.randint(40, 100)), (x, y), r)
             pygame.draw.circle(self.lit_surface, (60, 80, 120, random.randint(20, 50)), (x, y), r)
-        for _ in range(300):
-            angle = random.uniform(0, math.pi * 2)
-            dist = random.uniform(0, max_radius * 0.85)
-            pygame.draw.circle(self.dark_surface, (15, 15, 40, random.randint(100, 180)), (center + int(dist * math.cos(angle)), center + int(dist * math.sin(angle))), random.randint(2, 8))
 
         self.flash_timer = 0
         self.flash_state = 0
@@ -1318,13 +1310,6 @@ class Game:
         shoot_cooldown = 0
         player_hidden = False
         while running:
-            # Yield to browser event loop BEFORE heavy game logic so the
-            # browser can process pending events even when a frame does
-            # expensive synchronous work (e.g. GasCloud surface init at
-            # level 4+ allocates two large SRCALPHA surfaces with hundreds
-            # of draw calls — blocks for hundreds of ms on iPhone WASM).
-            await asyncio.sleep(0)
-
             self.time_ticker += 1
             if self.level_up_timer > 0: self.level_up_timer -= 1
 
